@@ -3,7 +3,7 @@ import numpy as np
 from planner.rrt_2d import Planner
 
 class Navigator:
-    def __init__(self, obstacles, pose, goal, linear_tolerance=0.2, angular_tolerance=5):
+    def __init__(self, obstacles, pose, goal, linear_tolerance=0.2, angular_tolerance=20):
         self.pose = [0., 0., 0.]
         self.linear_tolerance = linear_tolerance
         self.angular_tolerance = angular_tolerance * np.pi / 180
