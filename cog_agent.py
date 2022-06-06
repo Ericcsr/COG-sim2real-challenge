@@ -62,7 +62,7 @@ class Agent:
         # navigator = Navigator(stage_two_obstacles, self_pose, goal)
 
         ## navigate in every step
-        # navigator.navigaate(self_pose)
+        # navigator.navigate(self_pose)
         # --- #
 
         print("In Stage 2")
