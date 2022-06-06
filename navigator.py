@@ -1,18 +1,17 @@
 import numpy as np
 
-from planner.rrt_2d import Planner
+from planner.rrt_2d import plan
+
 
 class Navigator:
-    def __init__(self, obstacles, pose, goal, linear_tolerance=0.2, angular_tolerance=20):
+    def __init__(self, obstacles, pose, goal, mid_linear_tolerance=0.02, final_linear_tolerance=0.5, angular_tolerance=20):
         self.pose = [0., 0., 0.]
-        self.linear_tolerance = linear_tolerance
+        self.mid_linear_tolerance = mid_linear_tolerance
+        self.final_linear_tolerance = final_linear_tolerance
         self.angular_tolerance = angular_tolerance * np.pi / 180
 
         self.milestone = 0
-        self.planner = Planner(obstacles)
-        self.path = self.planner.plan(pose, goal)
-
-        self.action = [0., 0., 1., 0.]
+        self.path = plan(obstacles, pose, goal)
 
         if self.path.size > 0:
             self.path = self.path[1:]
@@ -45,15 +44,23 @@ class Navigator:
             return -rate
 
     def navigate(self, pose):
-        if self.milestone >= self.path.shape[0]:
-            return [0., 0.] + self.action[2:]
-
         self.pose = pose
-        self.action[:2] = self.move_to_target(self.path[self.milestone])
-        self.action[2] = self.towards_target(self.path[-1])
+
+        action = [0., 0., 0., 0.]
+        action[2] = self.towards_target(self.path[-1])
+
+        if self.milestone >= self.path.shape[0]:
+            return action
+
+        if self.milestone == self.path.shape[0]-1:
+            linear_tolerance = self.final_linear_tolerance
+        else:
+            linear_tolerance = self.mid_linear_tolerance
+
+        action[:2] = self.move_to_target(self.path[self.milestone])
 
         error = (self.pose[0] - self.path[self.milestone][0]) ** 2 + (self.pose[1] - self.path[self.milestone][1]) ** 2
-        if error < self.linear_tolerance:
+        if error < linear_tolerance:
             self.milestone += 1
 
-        return self.action
+        return action

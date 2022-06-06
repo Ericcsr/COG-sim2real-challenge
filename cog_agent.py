@@ -1,7 +1,6 @@
 import numpy as np
 
 from navigator import Navigator
-from planner.rrt_2d import Planner
 from map.build_obstacles import add_obstacles
 
 
@@ -19,7 +18,7 @@ class Agent:
     def agent_control(self, obs, done, info):
         # The formats of obs, done, info obey the  CogEnvDecoder api
         # realize your agent here
-        
+
         filtered_obs = self.filter(obs, self.init_flag)
         if info==None or info[1][3]<5:
             action = self.actor_stage_1(filtered_obs)
@@ -47,14 +46,25 @@ class Agent:
             self.current_goal += 1
             goal = goals[self.current_goal]
             del goals[self.current_goal]
-            updated_obstacles = add_obstacles(self.obstacles, np.array(goals)[:, :2])
-            updated_obstacles = add_obstacles(updated_obstacles, np.array(enemy_pose[:2]).reshape((1,2)), 350)
+            updated_obstacles = add_obstacles(self.obstacles, goals)
+            updated_obstacles = add_obstacles(updated_obstacles, np.array(enemy_pose[:2]).reshape((1,2)), 400)
             print(f"[Info] Planning for target {self.current_goal+1}.")
             self.navigator = Navigator(updated_obstacles, self_pose, goal)
 
         return self.navigator.navigate(self_pose)
 
     def actor_stage_2(self, obs):
+        # --- #
+        ## Global init
+        # stage_two_obstacles = add_obstacles(self.obstacles, goals_list)
+
+        ## Init for each goal
+        # navigator = Navigator(stage_two_obstacles, self_pose, goal)
+
+        ## navigate in every step
+        # navigator.navigaate(self_pose)
+        # --- #
+
         print("In Stage 2")
         return [0,0,0,0] # TODO: Replace it with my policy
 
