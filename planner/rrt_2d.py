@@ -20,15 +20,15 @@ def plan(obstacles, init, goal):
     rrt = RRT(X, Q, init, goal, max_samples, r, prc)
     path = rrt.rrt_search()
     if path:
-        # plot
-        plot = Plot("rrt_2d")
-        plot.plot_tree(X, rrt.trees)
-        if path is not None:
-            plot.plot_path(X, path)
-        plot.plot_obstacles(X, obstacles)
-        plot.plot_start(X, init)
-        plot.plot_goal(X, goal)
-        plot.draw(auto_open=True)
+        ## plot
+        # plot = Plot("rrt_2d")
+        # plot.plot_tree(X, rrt.trees)
+        # if path is not None:
+        #     plot.plot_path(X, path)
+        # plot.plot_obstacles(X, obstacles)
+        # plot.plot_start(X, init)
+        # plot.plot_goal(X, goal)
+        # plot.draw(auto_open=True)
 
         path = np.array(path) / 1000
         return path
