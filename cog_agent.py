@@ -1,7 +1,6 @@
 import numpy as np
 import copy
 from navigator import Navigator
-from planner.rrt_2d import Planner
 from map.build_obstacles import add_obstacles
 from WrappedInnerEnv import RobotEnv
 from filter import Filter
@@ -52,8 +51,8 @@ class Agent:
             self.current_goal += 1
             goal = goals[self.current_goal]
             del goals[self.current_goal]
-            updated_obstacles = add_obstacles(self.obstacles, np.array(goals)[:, :2])
-            updated_obstacles = add_obstacles(updated_obstacles, np.array(enemy_pose[:2]).reshape((1,2)), 350)
+            updated_obstacles = add_obstacles(self.obstacles, goals)
+            updated_obstacles = add_obstacles(updated_obstacles, np.array(enemy_pose[:2]).reshape((1,2)), 400)
             print(f"[Info] Planning for target {self.current_goal+1}.")
             self.navigator = Navigator(updated_obstacles, self_pose, goal)
 
