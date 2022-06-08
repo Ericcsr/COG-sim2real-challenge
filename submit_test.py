@@ -2,7 +2,7 @@ from Cogenvdecoder.CogEnvDecoder import CogEnvDecoder
 import numpy as np
 from cog_agent import Agent
 
-env = CogEnvDecoder(env_name="linux_v2.1/cog_sim2real_env.x86_64", no_graphics=False, time_scale=1, worker_id=1) 
+env = CogEnvDecoder(env_name="win_v2.1/cog_sim2real_env.exe", no_graphics=False, time_scale=1, worker_id=1) 
 
 num_eval_episodes = 10
 
@@ -17,7 +17,13 @@ for i in range(num_eval_episodes):
     obs = env.reset()
     done = False
     info = None
+    bias = np.random.random(2) - 0.5
+    
+    assert(not (obs['laser'] == 0).all())
     while not done:
+        obs['vector'][0][0] += bias[0] + (float(np.random.random(1)) * 0.2 - 0.1)
+        obs['vector'][0][1] += bias[1] + (float(np.random.random(1)) * 0.2 - 0.1)
+        obs['laser'] += np.random.random(61) * 0.1 - 0.05
         action = eval_agent.agent_control(obs=obs, done=done, info=info)
         obs, reward, done, info = env.step(action)
 

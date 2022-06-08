@@ -5,7 +5,7 @@ from planner.rrt_2d import plan
 
 class Navigator:
     def __init__(self, obstacles, pose, goal,
-                 mid_linear_tolerance=0.1, final_linear_tolerance=0.7, angular_tolerance=20,
+                 mid_linear_tolerance=0.3, final_linear_tolerance=0.5, angular_tolerance=5,
                  linear_speed=2, angular_speed=2):
         self.pose = pose
         self.mid_linear_tolerance = mid_linear_tolerance**2

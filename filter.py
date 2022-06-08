@@ -4,6 +4,12 @@ import time
 import param
 import copy
 
+def scan2pc(scan,robot_pose):
+	angles = np.linspace(robot_pose[2]-np.pi*1.5/2,robot_pose[2]+np.pi*1.5/2,len(scan))
+	pc = np.zeros((len(scan),2))
+	pc[:,0] = scan * np.cos(angles)+robot_pose[0]
+	pc[:,1] = scan * np.sin(angles)+robot_pose[1]
+	return pc
 #map
 class Lidar:
 	def __init__(self, num_particles=61, fov = np.pi * 1.5, max_dist=10000):
@@ -131,7 +137,16 @@ class MotionModel:
 		self.current_pose = init_pose.copy()
 		self.weight = weight
 
+	def map_velocity(self, action, theta):
+		action = copy.deepcopy(action)
+		vx = action[0] * np.cos(theta) - action[1] * np.sin(theta)
+		vy = action[0] * np.sin(theta) + action[1] * np.cos(theta)
+		action[0] = vx
+		action[1] = vy
+		return action
+
 	def update(self, action, s_obs):
+		action = self.map_velocity(action, self.current_pose[2])
 		s_update = self.current_pose + action[:3] * param.TS
 		w=np.array([self.weight, self.weight, 1])
 		s = w * s_obs + (1-w) * s_update
@@ -140,17 +155,18 @@ class MotionModel:
 
 class Filter:
 	def __init__(self, init_obs, init_pose, dyn_obs=None, samples=2000): # dyn_obs: [5, 2]
-		self.init_pos = np.asarray(init_pose[:2])
+		self.init_pos = np.array([float(init_pose[0]),float(init_pose[1])])
 		self.init_theta = init_pose[2]
 		self.init_obs = init_obs
 		self.lidar = Lidar()
 		if not (dyn_obs is None):
 			dynamic_obs = np.hstack([dyn_obs-0.15, dyn_obs+0.15]) * 1000
+			print(dynamic_obs)
 			self.lidar.add_dynamic_obstacles(dynamic_obs)
 		self.samples = samples
 		self.offset = self.debias()
-		self.current_pose = np.array([init_pose[0]+self.offset[0], 
-									  init_pose[1]+self.offset[1],init_pose[2]])
+		self.current_pose = np.array([float(init_pose[0])+float(self.offset[0]), 
+									  float(init_pose[1])+float(self.offset[1]),init_pose[2]])
 		self.model = MotionModel(self.current_pose)
 
 	def diff(self, scan):
@@ -180,9 +196,15 @@ class Filter:
 
 if __name__ == "__main__":
 	lidar = Lidar()
-	dist, pc = lidar.get_laser_ref(np.array([4.04, 1.7, 0]))
-	lidar.paint(pc,np.array([4.04, 1.7, 0]))
+	dist, pc = lidar.get_laser_ref(np.array([3.09, 2.17, 3.264104]))
+	pc2 = scan2pc(np.load("laser.npy")[::-1],np.array([3.09, 2.17, 3.264104]))
+	#pc = 
+	print(pc.shape)
+	lidar.paint(pc,np.array([3.09, 2.17, 3.264104]))
 	plt.show()
+	lidar.paint(pc2,np.array([3.09, 2.17, 3.264104]))
+	plt.show()
+	exit()
 	dist += np.random.random(61) * 0.05 - 0.025
 	init_guess = [3.9, 1.4, 0]
 	filter = Filter(dist, [3.9, 1.4, 0], samples = 200)

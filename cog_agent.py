@@ -71,15 +71,18 @@ class Agent:
                                        obs['vector'][7][:2],
                                        obs['vector'][8][:2],
                                        obs['vector'][9][:2],
-                                       obs['vector'][2][:2]]) # Enemy
-            self.filter = Filter(init_obs=obs['laser'],
+                                       obs['vector'][3][:2]]) # Enemy
+            self.filter = Filter(init_obs=obs['laser'][::-1],
                                  init_pose=obs['vector'][0],
                                  dyn_obs=dyn_obstacles,
-                                 samples=200)
+                                 samples=300)
             current_pose = self.filter.current_pose
         else:
-            current_pose = self.filter.filter_obs(obs['vec'], action)
+            current_pose = self.filter.filter_obs(obs['vector'], np.array(action))
+        
         current_obs['vector'][0] = current_pose.tolist()
+        print(current_obs['vector'][0])
+        #input()
         return current_obs
     
     def reset(self):
