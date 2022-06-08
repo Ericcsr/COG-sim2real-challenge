@@ -6,8 +6,8 @@ from planner.src.utilities.plotting import Plot
 
 Q = np.array([(150, 80)])  # length of tree edges
 r = 1  # length of smallest edge to check for intersection with obstacles
-max_samples = 99999 # max number of samples to take before timing out
-prc = 0.1  # probability of checking for a connection to goal
+max_samples = 1000 # max number of samples to take before timing out
+prc = 0.2  # probability of checking for a connection to goal
 
 
 def plan(X, init, goal):

@@ -5,6 +5,7 @@ from map.build_obstacles import add_obstacles
 from planner.src.search_space.search_space import SearchSpace
 from WrappedInnerEnv import RobotEnv
 from filter import Filter
+import time
 
 X_dimensions = np.array([(0, 8080), (0, 4480)])  # dimensions of Search Space
 
@@ -21,6 +22,9 @@ class Agent:
         self.obstacles = np.load("./map/initial_obstacles.npy")
         self.goals_list = None
         self.stage_two_searchspace = None
+        self.pose_buffer = []
+        self.buffer_length = 20
+        self.last_update = time.time()
 
     def agent_control(self, obs, done, info):
         # The formats of obs, done, info obey the CogEnvDecoder api
@@ -47,11 +51,16 @@ class Agent:
         if not self.goals_list:
             self.goals_list = [vector_data[i] for i in range(5, 10)]
             stage_two_obstacles = add_obstacles(self.obstacles, self.goals_list)
-            self.stage_two_searchspace = SearchSpace(X_dimensions, stage_two_obstacles)
-        action = self.stage_one(self_pose, enemy_pose, self.goals_list)
+            self.stage_2_search_space = SearchSpace(X_dimensions, stage_two_obstacles)
+        action = self.stage_one(self_pose, enemy_pose, [vector_data[i] for i in range(5, 10)])
         return action
 
     def stage_one(self, self_pose, enemy_pose, goals):
+        # Update self pose buffer
+        self.pose_buffer.append(self_pose)
+        if len(self.pose_buffer) > self.buffer_length:
+            self.pose_buffer.pop(0)
+
         if goals[-1][-1]:
             print("[Warning] round 1 already finished")
             return [0., 0., 0., 0.]
@@ -60,16 +69,54 @@ class Agent:
             self.current_goal += 1
             goal = goals[self.current_goal]
             del goals[self.current_goal]
-            updated_obstacles = add_obstacles(self.obstacles, goals)
-            updated_obstacles = add_obstacles(updated_obstacles, np.array(enemy_pose[:2]).reshape((1,2)), 400)
-            updated_search_space = SearchSpace(X_dimensions, updated_obstacles)
+            updated_obstacles = add_obstacles(self.obstacles, goals,size=250)
+            updated_obstacles = add_obstacles(updated_obstacles, np.array(enemy_pose[:2]).reshape((1,2)), 300)
+            stage_1_search_space = SearchSpace(X_dimensions, updated_obstacles)
             print(f"[Info] Planning for target {self.current_goal+1}.")
-            self.navigator = Navigator(updated_search_space, self_pose, goal)
-
-        return self.navigator.navigate(self_pose)
+            # Cooridinate back trace
+            cur = len(self.pose_buffer)-1
+            for i in range(len(self.pose_buffer)-1, -1, -1):
+                if stage_1_search_space.obstacle_free(self.pose_buffer[i][:2]):
+                    cur = i
+                    break
+            # Worst case
+            if cur == 0 and stage_1_search_space.obstacle_free(self.pose_buffer[0][:2]) == False:
+                for i in range(2 *self.buffer_length):
+                    cand_pose = self_pose + np.random.uniform(-0.1,0.1,2)
+                    if stage_1_search_space.obstacle_free(self.pose_buffer[0][:2]):
+                        self.pose_buffer[0] = cand_pose
+                        break
+                else:
+                    print("Cannot find a collision free pose")
+            for i in range(3):
+                self.navigator = Navigator(stage_1_search_space, self.pose_buffer[cur], goal)
+                result = self.navigator.plan()
+                if result == True:
+                    break
+                else:
+                    if cur > 0:
+                        cur -= 1
+                    else:
+                        self.pose_buffer[0] += np.uniform(-0.1,0.1,2)
+            else:
+                return np.array([0,0,0,0])
+                
+            #self.navigator = Navigator(stage_1_search_space, self_pose, goal)
+        action = self.navigator.navigate(self_pose)
+        return action
 
     def actor_stage_2(self, obs):
-        action = self.robot_env._inner_policy(obs, 0, 0)
+        result = False
+        if time.time() - self.last_update > 2:
+            # Sample a point within R radius of the enemy
+            self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], obs['vector'][3])
+            result = self.stage_2_navigator.plan()
+            self.last_update = time.time()
+        if not (self.stage_2_navigator is None) or result:
+            v = self.stage_2_navigator.navigate_linear(obs['vector'][0])
+        else:
+            v = [0,0]
+        action = self.robot_env._inner_policy(obs, v[0], v[1])
         return action
 
     def estimate(self, obs, action=None):
@@ -91,7 +138,7 @@ class Agent:
             current_pose = self.filter.filter_obs(obs['vector'], np.array(action))
         
         current_obs['vector'][0] = current_pose.tolist()
-        print(current_obs['vector'][0])
+        #print(current_obs['vector'][0])
         #input()
         return current_obs
 
