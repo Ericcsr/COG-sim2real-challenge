@@ -32,6 +32,7 @@ class Agent:
         if info is None:
             self.reset()
             filtered_obs = self.estimate(obs, None)
+            print("Filtered:", filtered_obs['vector'][0])
             self.robot_env.add_obstacles_from_obs(obs)
         else:
             filtered_obs = self.estimate(obs, self.last_action)

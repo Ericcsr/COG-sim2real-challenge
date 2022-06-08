@@ -5,14 +5,15 @@ import param
 import copy
 
 def scan2pc(scan,robot_pose):
-	angles = np.linspace(robot_pose[2]-np.pi*1.5/2,robot_pose[2]+np.pi*1.5/2,len(scan))
+	theta = robot_pose[2]+0.08
+	angles = np.linspace(theta-np.pi*1.5/2,theta+np.pi*1.5/2,len(scan), endpoint=False)
 	pc = np.zeros((len(scan),2))
 	pc[:,0] = scan * np.cos(angles)+robot_pose[0]
 	pc[:,1] = scan * np.sin(angles)+robot_pose[1]
 	return pc
 #map
 class Lidar:
-	def __init__(self, num_particles=61, fov = np.pi * 1.5, max_dist=10000):
+	def __init__(self, num_particles=61, fov = np.pi * 1.5, max_dist=10000, dyn_obs=None):
 		self.num_particles =num_particles
 		# [Lx, Ly, Ux, Uy]
 		self.obstacles = np.array([[0., 3280., 1000., 3480.], # B9
@@ -24,6 +25,8 @@ class Lidar:
 							  	   [3540., 3345., 4540., 3545.], # B6
 							  	   [3540., 935., 4540., 1135.], # B4
 								   [0, 0 , 8080, 4480]]) # Wall
+		if not (dyn_obs is None):
+			self.obstacles = np.vstack([self.obstacles, dyn_obs])
 		self.fov = fov
 		self.max_dist = max_dist
 		self.obstacles_segment = self.get_all_obstacles_segments(self.obstacles)
@@ -98,9 +101,9 @@ class Lidar:
 		:return: 1xn_reflections array indicating the laser end point
 		"""
 		xy_robot = robot_pose[:2] * 1000 #robot position from meter to mm
-		theta_robot = robot_pose[2] #robot angle in rad
+		theta_robot = robot_pose[2] + 0.08 #robot angle in rad
 		
-		angles = np.linspace(theta_robot - self.fov/2, theta_robot + self.fov/2, self.num_particles)
+		angles = np.linspace(theta_robot - self.fov/2, theta_robot + self.fov/2, self.num_particles, endpoint=False)
 		dist_theta = self.max_dist*np.ones(self.num_particles) # set all laser reflections to max_dist
 		point_theta = np.zeros((self.num_particles, 2))
 		
@@ -195,14 +198,15 @@ class Filter:
 		return updated_pose
 
 if __name__ == "__main__":
-	lidar = Lidar()
-	dist, pc = lidar.get_laser_ref(np.array([3.09, 2.17, 3.264104]))
-	pc2 = scan2pc(np.load("laser.npy")[::-1],np.array([3.09, 2.17, 3.264104]))
+	lidar = Lidar(dyn_obs=np.load("dyna_obs.npy"))
+	robot_pose = np.load("robot_pose.npy") 
+	dist, pc = lidar.get_laser_ref(robot_pose)
+	pc2 = scan2pc(np.load("laser.npy")[::-1],robot_pose)
 	#pc = 
 	print(pc.shape)
-	lidar.paint(pc,np.array([3.09, 2.17, 3.264104]))
+	lidar.paint(pc,robot_pose)
 	plt.show()
-	lidar.paint(pc2,np.array([3.09, 2.17, 3.264104]))
+	lidar.paint(pc2,robot_pose)
 	plt.show()
 	exit()
 	dist += np.random.random(61) * 0.05 - 0.025
