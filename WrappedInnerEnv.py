@@ -155,6 +155,12 @@ class RobotEnv(gym.Env):
     def remove_add_obs(self):
         self.collision_map.remove_rand_obstacles()
 
+    def calc_angle_diff(self, theta, my_pos, en_pos):
+        theta = self._remap_angle(theta)
+        delta_angle = np.arctan2(en_pos[1]-my_pos[1], en_pos[0]-my_pos[0])
+        diff = delta_angle - theta
+        return diff
+
     def close(self):
         assert self.cog_env != None
         self.cog_env.close()

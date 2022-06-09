@@ -106,11 +106,12 @@ class Lidar:
 		angles = np.linspace(theta_robot - self.fov/2, theta_robot + self.fov/2, self.num_particles, endpoint=False)
 		dist_theta = self.max_dist*np.ones(self.num_particles) # set all laser reflections to max_dist
 		point_theta = np.zeros((self.num_particles, 2))
+		delta_vec = np.array([0.15 * np.cos(robot_pose[2]), 0.15 * np.sin(robot_pose[2])])
 		
 		for seg_i in self.obstacles_segment:
 			xy_i_start, xy_i_end = np.array(seg_i[:2]), np.array(seg_i[2:]) #starting and ending points of each segment
 			for j, theta in enumerate(angles):
-				xy_ij_max = xy_robot + np.array([self.max_dist*np.cos(theta), self.max_dist*np.sin(theta)]) # max possible distance
+				xy_ij_max = xy_robot + np.array([self.max_dist*np.cos(theta), self.max_dist*np.sin(theta)]) + delta_vec # max possible distance
 				intersection = self.get_intersection(xy_i_start, xy_i_end, xy_robot, xy_ij_max)
 
 				if intersection is not None: #if the line segments intersect

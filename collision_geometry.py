@@ -1,7 +1,5 @@
 import numpy as np
-
-X_MAX = 8.08
-Y_MAX = 4.48
+from param import X_MAX, Y_MAX
 
 def map_to_world(obj_pos, obj_orn, rel_p):
     rot_p = np.array([np.cos(obj_orn)*rel_p[0]-np.sin(obj_orn)*rel_p[1],

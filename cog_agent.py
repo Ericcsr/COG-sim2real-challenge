@@ -5,6 +5,7 @@ from map.build_obstacles import add_obstacles
 from planner.src.search_space.search_space import SearchSpace
 from WrappedInnerEnv import RobotEnv
 from filter import Filter
+import param
 import time
 
 X_dimensions = np.array([(0, 8080), (0, 4480)])  # dimensions of Search Space
@@ -25,6 +26,12 @@ class Agent:
         self.pose_buffer = []
         self.buffer_length = 20
         self.last_update = time.time()
+        # Calculate min distance between all obstacles and corners
+        self.corners = np.array([[0.5,0.5],
+                                 [0.5,param.Y_MAX-0.5],
+                                 [param.X_MAX-0.5, 0.5],
+                                 [param.X_MAX-0.5, param.Y_MAX-0.5]])
+        self.corner_dists = np.zeros(4)
 
     def agent_control(self, obs, done, info):
         # The formats of obs, done, info obey the CogEnvDecoder api
@@ -34,6 +41,8 @@ class Agent:
             filtered_obs = self.estimate(obs, None)
             print("Filtered:", filtered_obs['vector'][0])
             self.robot_env.add_obstacles_from_obs(obs)
+            self.calc_min_dist(obs)
+
         else:
             filtered_obs = self.estimate(obs, self.last_action)
 
@@ -52,6 +61,7 @@ class Agent:
         if not self.goals_list:
             self.goals_list = [vector_data[i] for i in range(5, 10)]
             stage_two_obstacles = add_obstacles(self.obstacles, self.goals_list)
+            stage_two_obstacles = add_obstacles(stage_two_obstacles, self.goals_list,size=250)
             self.stage_2_search_space = SearchSpace(X_dimensions, stage_two_obstacles)
         action = self.stage_one(self_pose, enemy_pose, [vector_data[i] for i in range(5, 10)])
         return action
@@ -108,9 +118,18 @@ class Agent:
 
     def actor_stage_2(self, obs):
         result = False
+        advantage = self.calculate_advantage(obs)
         if time.time() - self.last_update > 2:
             # Sample a point within R radius of the enemy
-            self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], obs['vector'][3])
+            if advantage:
+                self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], obs['vector'][3],final_linear_tolerance=1.7)
+            else:
+                best_corner = self.find_best_corner(obs)
+                print(best_corner)
+                if not (best_corner is None):
+                    self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], self.corners[best_corner])
+                else:
+                    self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], obs['vector'][3])
             result = self.stage_2_navigator.plan()
             self.last_update = time.time()
         if not (self.stage_2_navigator is None) or result:
@@ -157,3 +176,44 @@ class Agent:
             ## `self.stage_two_searchspace` is already initialized in stage one
             navigator = Navigator(self.stage_two_searchspace, self_pose, test_goal)  # Plan a path
             navigator.navigate(self_pose)  # Follow the path
+
+    def calculate_advantage(self, obs):
+        my_ammo = obs['vector'][1][1]
+        en_hp = obs['vector'][4][0]
+        my_diff = self.robot_env.calc_angle_diff(obs['vector'][0][2],
+                                                obs['vector'][0][:2],
+                                                obs['vector'][3][:2])
+        en_diff = self.robot_env.calc_angle_diff(obs['vector'][3][2],
+                                                obs['vector'][3][:2],
+                                                obs['vector'][0][:2])
+        if my_ammo*100 < en_hp:
+            return False
+        elif en_diff < my_diff and abs(my_diff) > np.pi/3:
+            return False
+        else:
+            return True
+
+    def calc_min_dist(self, obs):
+        for i in range(4):
+            min_dist = np.inf
+            for j in range(5):
+                dist = np.linalg.norm(self.corners[i]-obs['vector'][5+j][:2])
+                if dist < min_dist:
+                    min_dist = dist
+            self.corner_dists[i] = min_dist
+
+    def find_best_corner(self, obs):
+        best_corner = None
+        best_dist = -np.inf
+        for i in range(4):
+            if self.corner_dists[i] < 0.5:
+                continue
+            else:
+                dist_to_enemy = np.linalg.norm(self.corners[i] - obs['vector'][3][:2])
+                if dist_to_enemy > best_dist:
+                    best_dist = dist_to_enemy
+                    best_corner = i
+        return best_corner
+            
+        
+
