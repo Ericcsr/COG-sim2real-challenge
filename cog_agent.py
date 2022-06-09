@@ -101,9 +101,11 @@ class Agent:
                         self.pose_buffer[0] += np.uniform(-0.1,0.1,2)
             else:
                 return np.array([0,0,0,0])
-                
+
             #self.navigator = Navigator(stage_1_search_space, self_pose, goal)
         action = self.navigator.navigate(self_pose)
+        if np.allclose(np.array([0.,0.,0.,0.]), action):
+            self.current_goal -= 1
         return action
 
     def actor_stage_2(self, obs):
@@ -137,7 +139,7 @@ class Agent:
             current_pose = self.filter.current_pose
         else:
             current_pose = self.filter.filter_obs(obs['vector'], np.array(action))
-        
+
         current_obs['vector'][0] = current_pose.tolist()
         #print(current_obs['vector'][0])
         #input()

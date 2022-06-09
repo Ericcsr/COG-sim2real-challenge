@@ -18,18 +18,18 @@ class Navigator:
         self.milestone = 0
         self.obstacles = obstacles
         self.goal = goal
-        
+
     def plan(self):
         self.path = plan(self.obstacles, self.pose, self.goal)
 
-        
+
         if self.path.size > 1:
             self.path = self.path[1:]
             print("[Info] Done planning")
             return True
         else:
             print("[Fatal] Planning failed.")
-            return False            
+            return False
 
     def tf(self, target):
         delta_x = target[0] - self.pose[0]
@@ -100,7 +100,7 @@ class Navigator:
         action[:2] = self.move_to_target_linear(self.path[self.milestone])
 
         error = (self.pose[0] - self.path[self.milestone][0]) ** 2 + (self.pose[1] - self.path[self.milestone][1]) ** 2
-        
+
         if error < linear_tolerance:
             self.milestone += 1
 
