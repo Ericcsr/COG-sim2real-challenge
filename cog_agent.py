@@ -107,7 +107,7 @@ class Agent:
                     if cur > 0:
                         cur -= 1
                     else:
-                        self.pose_buffer[0] += np.random.uniform(-0.1,0.1,2)
+                        self.pose_buffer[0] += np.random.uniform(-0.1,0.1,3)
             else:
                 return np.array([0,0,0,0])
 
