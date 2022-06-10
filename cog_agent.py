@@ -60,8 +60,7 @@ class Agent:
         enemy_pose = vector_data[3]
         if not self.goals_list:
             self.goals_list = [vector_data[i] for i in range(5, 10)]
-            stage_two_obstacles = add_obstacles(self.obstacles, self.goals_list)
-            stage_two_obstacles = add_obstacles(stage_two_obstacles, self.goals_list,size=250)
+            stage_two_obstacles = add_obstacles(self.obstacles, self.goals_list, size=250)
             self.stage_2_search_space = SearchSpace(X_dimensions, stage_two_obstacles)
         action = self.stage_one(self_pose, enemy_pose, [vector_data[i] for i in range(5, 10)])
         return action
@@ -108,7 +107,7 @@ class Agent:
                     if cur > 0:
                         cur -= 1
                     else:
-                        self.pose_buffer[0] += np.uniform(-0.1,0.1,2)
+                        self.pose_buffer[0] += np.random.uniform(-0.1,0.1,2)
             else:
                 return np.array([0,0,0,0])
 
@@ -124,7 +123,7 @@ class Agent:
         if time.time() - self.last_update > 2:
             # Sample a point within R radius of the enemy
             if advantage:
-                self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], obs['vector'][3],final_linear_tolerance=1.7)
+                self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], obs['vector'][3],final_linear_tolerance=2.0)
             else:
                 best_corner = self.find_best_corner(obs)
                 print(best_corner)

@@ -18,7 +18,10 @@ Step 3. Install the COG_API package with command:
 
         pip install CogEnvDecoder
 
-Step 4. Run the api_test.py, you will see our simulation environment.  
+Step 4. Install some related packages:
+        pip install rtree plotly
+
+Step 5. Run the submit_test.py, you will see our simulation environment. Please use v2.2 to test the algorithm
 
 ## Important notes
 

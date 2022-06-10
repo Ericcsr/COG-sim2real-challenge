@@ -24,7 +24,7 @@ class RRT(RRTBase):
         self.add_vertex(0, self.x_init)
         self.add_edge(0, self.x_init, None)
 
-        for _ in range(5):
+        for _ in range(10):
             for q in self.Q:  # iterate over different edge lengths until solution found or time out
                 for i in range(q[1]):  # iterate over number of edges of given length to add
                     x_new, x_nearest = self.new_and_near(0, q)

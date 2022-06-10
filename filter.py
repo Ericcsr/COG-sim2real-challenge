@@ -106,7 +106,7 @@ class Lidar:
 		angles = np.linspace(theta_robot - self.fov/2, theta_robot + self.fov/2, self.num_particles, endpoint=False)
 		dist_theta = self.max_dist*np.ones(self.num_particles) # set all laser reflections to max_dist
 		point_theta = np.zeros((self.num_particles, 2))
-		delta_vec = np.array([0.15 * np.cos(robot_pose[2]), 0.15 * np.sin(robot_pose[2])])
+		delta_vec = np.array([0. * np.cos(robot_pose[2]), 0. * np.sin(robot_pose[2])])
 		
 		for seg_i in self.obstacles_segment:
 			xy_i_start, xy_i_end = np.array(seg_i[:2]), np.array(seg_i[2:]) #starting and ending points of each segment
