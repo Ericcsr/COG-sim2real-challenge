@@ -92,7 +92,7 @@ class Agent:
             # Worst case
             if cur == 0 and stage_1_search_space.obstacle_free(self.pose_buffer[0][:2]) == False:
                 for i in range(2 *self.buffer_length):
-                    cand_pose = self_pose + np.random.uniform(-0.1,0.1,2)
+                    cand_pose = self_pose + np.random.uniform(-0.1,0.1,3)
                     if stage_1_search_space.obstacle_free(self.pose_buffer[0][:2]):
                         self.pose_buffer[0] = cand_pose
                         break
@@ -215,6 +215,3 @@ class Agent:
                     best_dist = dist_to_enemy
                     best_corner = i
         return best_corner
-            
-        
-
