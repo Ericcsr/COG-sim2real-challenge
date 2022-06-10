@@ -80,20 +80,20 @@ class Agent:
             goal = goals[self.current_goal]
             del goals[self.current_goal]
             updated_obstacles = add_obstacles(self.obstacles, goals,size=250)
-            updated_obstacles = add_obstacles(updated_obstacles, np.array(enemy_pose[:2]).reshape((1,2)), 300)
+            updated_obstacles = add_obstacles(updated_obstacles, np.array(enemy_pose[:2]).reshape((1,2)), 350)
             stage_1_search_space = SearchSpace(X_dimensions, updated_obstacles)
             print(f"[Info] Planning for target {self.current_goal+1}.")
             # Cooridinate back trace
             cur = len(self.pose_buffer)-1
             for i in range(len(self.pose_buffer)-1, -1, -1):
-                if stage_1_search_space.obstacle_free(self.pose_buffer[i][:2]):
+                if stage_1_search_space.obstacle_free_wrapped(self.pose_buffer[i][:2]):
                     cur = i
                     break
             # Worst case
-            if cur == 0 and stage_1_search_space.obstacle_free(self.pose_buffer[0][:2]) == False:
+            if cur == 0 and stage_1_search_space.obstacle_free_wrapped(self.pose_buffer[0][:2]) == False:
                 for i in range(2 *self.buffer_length):
                     cand_pose = self_pose + np.random.uniform(-0.1,0.1,3)
-                    if stage_1_search_space.obstacle_free(self.pose_buffer[0][:2]):
+                    if stage_1_search_space.obstacle_free_wrapped(self.pose_buffer[0][:2]):
                         self.pose_buffer[0] = cand_pose
                         break
                 else:
@@ -108,8 +108,8 @@ class Agent:
                         cur -= 1
                     else:
                         self.pose_buffer[0] += np.random.uniform(-0.1,0.1,3)
-            else:
-                return np.array([0,0,0,0])
+            # else:
+            #     return np.array([0,0,0,0])
 
             #self.navigator = Navigator(stage_1_search_space, self_pose, goal)
         action = self.navigator.navigate(self_pose)
@@ -172,7 +172,7 @@ class Agent:
         test_goal = (4,2)
 
         ## Obstacle free test
-        if self.stage_two_searchspace.obstacle_free(test_goal):  # return True if not inside an obstacle, False otherwise
+        if self.stage_two_searchspace.obstacle_free_wrapped(test_goal):  # return True if not inside an obstacle, False otherwise
             ## Planning
             ## `self.stage_two_searchspace` is already initialized in stage one
             navigator = Navigator(self.stage_two_searchspace, self_pose, test_goal)  # Plan a path

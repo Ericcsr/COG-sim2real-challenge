@@ -46,6 +46,15 @@ class SearchSpace(object):
         """
         return self.obs.count(x) == 0
 
+    def obstacle_free_wrapped(self, x):
+        """
+        Check if a location resides inside of an obstacle
+        :param x: location to check
+        :return: True if not inside an obstacle, False otherwise
+        """
+        x = (x[0] * 1000, x[1] * 1000)
+        return self.obs.count(x) == 0
+
     def sample_free(self):
         """
         Sample a location within X_free

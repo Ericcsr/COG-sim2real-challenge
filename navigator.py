@@ -4,7 +4,7 @@ from planner.rrt_2d import plan
 
 
 class Navigator:
-    def __init__(self, obstacles, pose, goal,
+    def __init__(self, obstacles, pose, goal, set_random=False,
                  mid_linear_tolerance=0.3, final_linear_tolerance=0.5, angular_tolerance=5,
                  linear_speed=2, angular_speed=2):
         self.pose = pose
@@ -18,10 +18,23 @@ class Navigator:
         self.milestone = 0
         self.obstacles = obstacles
         self.goal = goal
+        if set_random:
+            self.set_rand_target()
+        else:
+            self.path = None
 
     def plan(self):
-        self.path = plan(self.obstacles, self.pose, self.goal)
+        origin_goal = self.goal[:2]
+        for _ in range(100):
+            if self.obstacles.obstacle_free_wrapped(self.goal):
+                break
+            print("[Warning] Goal in obstacle!")
+            self.goal[:2] = origin_goal + np.random.uniform(-0.2, 0.2, (2,))
+        else:
+            print("[Fatal] Cannot find a clear goal!")
+            self.set_rand_target()
 
+        self.path = plan(self.obstacles, self.pose, self.goal)
 
         if self.path.size > 1:
             self.path = self.path[1:]
@@ -29,7 +42,15 @@ class Navigator:
             return True
         else:
             print("[Fatal] Planning failed.")
+            self.set_rand_target()
             return False
+
+    def set_rand_target(self):
+        for _ in range(100):
+            random_target = self.pose[:2] + np.random.uniform(-0.2, 0.2, (2, 2))
+            if self.obstacles.obstacle_free_wrapped(random_target[1]):
+                self.path = random_target
+                break
 
     def tf(self, target):
         delta_x = target[0] - self.pose[0]
