@@ -17,7 +17,13 @@ for i in range(num_eval_episodes):
     obs = env.reset()
     done = False
     info = None
+    bias = np.random.uniform(-0.5, 0.5, 2)
+    print("Before:",obs['vector'][0][:2])
     while not done:
+        pos_noise = np.random.uniform(-0.1, 0.1, 2)
+        scan_noise = np.random.uniform(-0.05, 0.05, len(obs['laser']))
+        obs['vector'][0][:2] += bias + pos_noise
+        obs['laser'] += scan_noise
         action = eval_agent.agent_control(obs=obs, done=done, info=info)
         obs, reward, done, info = env.step(action)
 

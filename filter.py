@@ -106,7 +106,7 @@ class Lidar:
 		angles = np.linspace(theta_robot - self.fov/2, theta_robot + self.fov/2, self.num_particles, endpoint=False)
 		dist_theta = self.max_dist*np.ones(self.num_particles) # set all laser reflections to max_dist
 		point_theta = np.zeros((self.num_particles, 2))
-		delta_vec = np.array([0. * np.cos(robot_pose[2]), 0. * np.sin(robot_pose[2])])
+		delta_vec = np.array([0.15 * np.cos(robot_pose[2]), 0.15 * np.sin(robot_pose[2])])
 		
 		for seg_i in self.obstacles_segment:
 			xy_i_start, xy_i_end = np.array(seg_i[:2]), np.array(seg_i[2:]) #starting and ending points of each segment
@@ -168,7 +168,8 @@ class Filter:
 			print(dynamic_obs)
 			self.lidar.add_dynamic_obstacles(dynamic_obs)
 		self.samples = samples
-		self.offset = self.debias()
+		#self.offset = self.debias()
+		self.offset = self.debias_hierarchical()
 		self.current_pose = np.array([float(init_pose[0])+float(self.offset[0]), 
 									  float(init_pose[1])+float(self.offset[1]),init_pose[2]])
 		self.model = MotionModel(self.current_pose)
@@ -190,6 +191,23 @@ class Filter:
 				dist = _dist
 				idx = i
 		return rand_coord[idx] - self.init_pos
+
+	def debias_hierarchical(self, search_depth = 3):
+		current_guess = self.init_pos.copy()
+		for i in range(search_depth):
+			rand_coord = np.tile(current_guess, self.samples//search_depth).reshape(-1, 2)
+			#print(rand_coord.shape)
+			E = np.random.uniform(-0.5/(i+1), 0.5/(i+1), size=(self.samples//search_depth,2))
+			rand_coord += E
+			dists = np.zeros(self.samples//search_depth)
+			for j in range(self.samples//search_depth):
+				scan, _ = self.lidar.get_laser_ref(np.array([rand_coord[j,0], rand_coord[j,1],self.init_theta]))
+				_dist = self.diff(scan)
+				dists[j] = _dist
+			order = np.argsort(dists)
+			current_guess = np.mean(rand_coord[order][:3], axis=0) # Only select top 3 as candidate.
+		return current_guess - self.init_pos
+			
 
 	def filter_obs(self, obs_vec, action):
 		obs_pose = obs_vec[0][:3]
