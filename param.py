@@ -3,7 +3,7 @@ import platform
 
 VEC_DIM=10
 VELOCITY_LIMIT=2
-OMEGA_LIMIT=np.pi/4
+OMEGA_LIMIT=np.pi/2
 TS=0.04
 X_MAX = 8.08
 Y_MAX = 4.48

@@ -1,6 +1,6 @@
 import numpy as np
 
-redundancy = 150
+redundancy = 200
 
 
 def add_obstacles(origin, new_obstacle_centers, size=350):

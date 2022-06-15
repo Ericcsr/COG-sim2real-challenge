@@ -150,6 +150,7 @@ class MotionModel:
 		return action
 
 	def update(self, action, s_obs):
+		action.clip([-2,-2,-np.pi/4,-np.inf],[2,2,np.pi/4,np.inf])
 		action = self.map_velocity(action, self.current_pose[2])
 		s_update = self.current_pose + action[:3] * param.TS
 		w=np.array([self.weight, self.weight, 1])

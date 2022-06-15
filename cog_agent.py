@@ -60,7 +60,7 @@ class Agent:
         enemy_pose = vector_data[3]
         if not self.goals_list:
             self.goals_list = [vector_data[i] for i in range(5, 10)]
-            stage_two_obstacles = add_obstacles(self.obstacles, self.goals_list, size=250)
+            stage_two_obstacles = add_obstacles(self.obstacles, self.goals_list, size=350)
             self.stage_2_search_space = SearchSpace(X_dimensions, stage_two_obstacles)
         action = self.stage_one(self_pose, enemy_pose, [vector_data[i] for i in range(5, 10)])
         return action
@@ -79,7 +79,7 @@ class Agent:
             self.current_goal += 1
             goal = goals[self.current_goal]
             del goals[self.current_goal]
-            updated_obstacles = add_obstacles(self.obstacles, goals,size=250)
+            updated_obstacles = add_obstacles(self.obstacles, goals,size=300)
             updated_obstacles = add_obstacles(updated_obstacles, np.array(enemy_pose[:2]).reshape((1,2)), 350)
             stage_1_search_space = SearchSpace(X_dimensions, updated_obstacles)
             print(f"[Info] Planning for target {self.current_goal+1}.")
@@ -99,7 +99,7 @@ class Agent:
                 else:
                     print("Cannot find a collision free pose")
             for i in range(3):
-                self.navigator = Navigator(stage_1_search_space, self.pose_buffer[cur], goal)
+                self.navigator = Navigator(stage_1_search_space, self.pose_buffer[cur], goal, linear_speed=2)
                 result = self.navigator.plan()
                 if result == True:
                     break
@@ -123,14 +123,14 @@ class Agent:
         if time.time() - self.last_update > 2:
             # Sample a point within R radius of the enemy
             if advantage:
-                self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], obs['vector'][3],final_linear_tolerance=2.0)
+                self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], obs['vector'][3], final_linear_tolerance=2)
             else:
                 best_corner = self.find_best_corner(obs)
                 print(best_corner)
                 if not (best_corner is None):
                     self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], self.corners[best_corner])
                 else:
-                    self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], obs['vector'][3])
+                    self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], obs['vector'][3], final_linear_tolerance=2)
             result = self.stage_2_navigator.plan()
             self.last_update = time.time()
         if not (self.stage_2_navigator is None) or result:

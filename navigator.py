@@ -5,8 +5,8 @@ from planner.rrt_2d import plan
 
 class Navigator:
     def __init__(self, obstacles, pose, goal, set_random=False,
-                 mid_linear_tolerance=0.3, final_linear_tolerance=0.5, angular_tolerance=5,
-                 linear_speed=2, angular_speed=2):
+                 mid_linear_tolerance=0.1, final_linear_tolerance=0.5, angular_tolerance=5,
+                 linear_speed=1, angular_speed=np.pi/4):
         self.pose = pose
         self.mid_linear_tolerance = mid_linear_tolerance**2
         self.final_linear_tolerance = final_linear_tolerance**2
@@ -67,7 +67,7 @@ class Navigator:
 
     def move_to_target_linear(self, target):
         delta = np.array([target[0] - self.pose[0],target[1] - self.pose[1]])
-        direction = delta / np.linalg.norm(delta)
+        direction = delta / np.linalg.norm(delta) * self.linear_speed
         return direction.tolist()
 
     def towards_target(self, target):
