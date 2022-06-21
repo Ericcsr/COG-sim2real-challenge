@@ -6,11 +6,12 @@ from planner.rrt_2d import plan
 class Navigator:
     def __init__(self, obstacles, pose, goal, set_random=False,
                  mid_linear_tolerance=0.1, final_linear_tolerance=0.5, angular_tolerance=5,
-                 linear_speed=1, angular_speed=np.pi/4):
+                 linear_speed=1.6, angular_speed=np.pi/4, rate=1):
         self.pose = pose
         self.mid_linear_tolerance = mid_linear_tolerance**2
         self.final_linear_tolerance = final_linear_tolerance**2
         self.angular_tolerance = angular_tolerance * np.pi / 180
+        self.rate = rate
 
         self.linear_speed = linear_speed
         self.angular_speed = angular_speed
@@ -59,11 +60,17 @@ class Navigator:
         y_in_robot = -delta_x * np.sin(self.pose[2]) + delta_y * np.cos(self.pose[2])
         return x_in_robot, y_in_robot
 
-    def move_to_target(self, target):
+    def move_to_target(self, target, in_final=False):
         delta_linear = np.array(self.tf(target))
+        dist = np.linalg.norm(delta_linear)
+        if in_final:
+            speed = min((self.linear_speed, dist * self.rate))
+        else:
+            speed = self.linear_speed
+
         direction = delta_linear / np.linalg.norm(delta_linear)
-        direction *= self.linear_speed
-        return direction.tolist()
+
+        return (direction * speed).tolist()
 
     def move_to_target_linear(self, target):
         delta = np.array([target[0] - self.pose[0],target[1] - self.pose[1]])
@@ -97,7 +104,7 @@ class Navigator:
         else:
             linear_tolerance = self.mid_linear_tolerance
 
-        action[:2] = self.move_to_target(self.path[self.milestone])
+        action[:2] = self.move_to_target(self.path[self.milestone], in_final)
 
         error = (self.pose[0] - self.path[self.milestone][0]) ** 2 + (self.pose[1] - self.path[self.milestone][1]) ** 2
         if error < linear_tolerance:
