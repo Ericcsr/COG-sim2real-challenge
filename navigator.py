@@ -5,8 +5,8 @@ from planner.rrt_2d import plan
 
 class Navigator:
     def __init__(self, obstacles, pose, goal, set_random=False,
-                 mid_linear_tolerance=0.1, final_linear_tolerance=0.5, angular_tolerance=5,
-                 linear_speed=1.6, angular_speed=np.pi/4, rate=1):
+                 mid_linear_tolerance=0.1, final_linear_tolerance=0.7, angular_tolerance=5,
+                 linear_speed=1.6, angular_speed=np.pi/4, rate=1.5):
         self.pose = pose
         self.mid_linear_tolerance = mid_linear_tolerance**2
         self.final_linear_tolerance = final_linear_tolerance**2
@@ -30,7 +30,7 @@ class Navigator:
             if self.obstacles.obstacle_free_wrapped(self.goal):
                 break
             print("[Warning] Goal in obstacle!")
-            self.goal[:2] = origin_goal + np.random.uniform(-0.2, 0.2, (2,))
+            self.goal[:2] = origin_goal + np.random.uniform(-0.25, 0.25, (2,))
         else:
             print("[Fatal] Cannot find a clear goal!")
             self.set_rand_target()
@@ -62,7 +62,7 @@ class Navigator:
 
     def move_to_target(self, target, in_final=False):
         delta_linear = np.array(self.tf(target))
-        dist = np.linalg.norm(delta_linear)
+        dist = np.linalg.norm(delta_linear) - self.final_linear_tolerance + 0.01
         if in_final:
             speed = min((self.linear_speed, dist * self.rate))
         else:

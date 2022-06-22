@@ -79,8 +79,8 @@ class Agent:
             self.current_goal += 1
             goal = goals[self.current_goal]
             del goals[self.current_goal]
-            updated_obstacles = add_obstacles(self.obstacles, goals,size=300)
-            updated_obstacles = add_obstacles(updated_obstacles, np.array(enemy_pose[:2]).reshape((1,2)), 350)
+            updated_obstacles = add_obstacles(self.obstacles, goals, size=350)
+            updated_obstacles = add_obstacles(updated_obstacles, np.array(enemy_pose[:2]).reshape((1,2)), 400)
             stage_1_search_space = SearchSpace(X_dimensions, updated_obstacles)
             print(f"[Info] Planning for target {self.current_goal+1}.")
             # Cooridinate back trace
@@ -99,7 +99,7 @@ class Agent:
                 else:
                     print("Cannot find a collision free pose")
             for i in range(3):
-                self.navigator = Navigator(stage_1_search_space, self.pose_buffer[cur], goal, linear_speed=2)
+                self.navigator = Navigator(stage_1_search_space, self.pose_buffer[cur], goal, linear_speed=1.9)
                 result = self.navigator.plan()
                 if result == True:
                     break
