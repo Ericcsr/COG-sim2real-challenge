@@ -1,5 +1,6 @@
 import numpy as np
 import copy
+import multiprocessing as mp
 from navigator import Navigator
 from map.build_obstacles import add_obstacles
 from planner.src.search_space.search_space import SearchSpace
@@ -26,6 +27,13 @@ class Agent:
         self.pose_buffer = []
         self.buffer_length = 20
         self.last_update = time.time()
+        self.queue = mp.Queue()
+        self.info_queue = mp.Queue()
+        self.lock = mp.Lock()
+        self.running_flag = mp.Value("i", 0)
+        self.stage_2_init = True
+        self.stage_2_navigator = None
+        self.plan_process = mp.Process(target=self.planning_process)
         # Calculate min distance between all obstacles and corners
         self.corners = np.array([[0.5,0.5],
                                  [0.5,param.Y_MAX-0.5],
@@ -118,27 +126,55 @@ class Agent:
         return action
 
     def actor_stage_2(self, obs):
-        result = False
+        # Should be done in parallel
+        if self.stage_2_init:
+            self.stage_2_init = False
+            self.running_flag.value = 1
+            self.plan_process.start()
         advantage = self.calculate_advantage(obs)
-        if time.time() - self.last_update > 2:
-            # Sample a point within R radius of the enemy
-            if advantage:
-                self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], obs['vector'][3], final_linear_tolerance=2)
-            else:
-                best_corner = self.find_best_corner(obs)
-                print(best_corner)
-                if not (best_corner is None):
-                    self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], self.corners[best_corner])
-                else:
-                    self.stage_2_navigator = Navigator(self.stage_2_search_space, obs['vector'][0], obs['vector'][3], final_linear_tolerance=2)
-            result = self.stage_2_navigator.plan()
-            self.last_update = time.time()
-        if not (self.stage_2_navigator is None) or result:
+        best_corner = self.find_best_corner(obs)
+        self.lock.acquire()
+        self.info_queue.put([obs['vector'][0], obs['vector'][3], advantage, best_corner])
+        self.lock.release()
+        try:
+            self.stage_2_navigator = self.queue.get_nowait()
+        except:
+            pass
+        if not (self.stage_2_navigator is None):
             v = self.stage_2_navigator.navigate_linear(obs['vector'][0])
+            print("Reach Here")
         else:
             v = [0,0]
         action = self.robot_env._inner_policy(obs, v[0], v[1])
         return action
+
+    def plan_movement_stage_2(self,my_pose, en_pose, advantage_flag, best_corner):
+        if advantage_flag:
+            navigator = Navigator(self.stage_2_search_space, my_pose, en_pose, final_linear_tolerance=2)
+        else:
+            if not (best_corner is None):
+                navigator = Navigator(self.stage_2_search_space, my_pose, self.corners[best_corner], final_linear_tolerance=2)
+            else:
+                navigator = Navigator(self.stage_2_search_space, my_pose, en_pose, final_linear_tolerance=2)
+        result = navigator.plan()
+        if result:
+            self.queue.put(navigator)
+
+    def planning_process(self):
+        while self.running_flag.value:
+            # Need to lock
+            self.lock.acquire()
+            try:
+                for i in range(self.info_queue.qsize()):
+                    info = self.info_queue.get()
+            except:
+                info = None
+            self.lock.release()
+            # Need to unlock
+            if not (info is None):
+                self.plan_movement_stage_2(info[0], info[1], info[2], info[3])
+            time.sleep(0.01)
+
 
     def estimate(self, obs, action=None):
         current_obs = copy.deepcopy(obs)
@@ -167,6 +203,9 @@ class Agent:
         self.robot_env.remove_add_obs()
         self.robot_env.last_flag = False
         self.current_goal = -1
+        self.plan_process = mp.Process(target=self.planning_process)
+        self.running_flag.value = 0
+        
 
     def api_test(self, self_pose):
         test_goal = (4,2)

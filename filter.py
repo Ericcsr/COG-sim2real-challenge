@@ -5,8 +5,9 @@ import param
 import copy
 
 def scan2pc(scan,robot_pose):
-	theta = robot_pose[2]+0.08
-	angles = np.linspace(theta-np.pi*1.5/2,theta+np.pi*1.5/2,len(scan), endpoint=False)
+	theta = robot_pose[2]-0.18
+	robot_pose[:2] += np.array([0.12 * np.cos(theta), 0.12 * np.sin(theta)])
+	angles = np.linspace(theta-np.pi*120/180,theta+np.pi*120/180,len(scan), endpoint=True)
 	pc = np.zeros((len(scan),2))
 	pc[:,0] = scan * np.cos(angles)+robot_pose[0]
 	pc[:,1] = scan * np.sin(angles)+robot_pose[1]
@@ -60,10 +61,10 @@ class Lidar:
 
 	def get_intersection(self, a1, a2, b1, b2) :
 		"""
-		:param a1: (x1,y1) line segment 1 - starting position
-		:param a2: (x1',y1') line segment 1 - ending position
-		:param b1: (x2,y2) line segment 2 - starting position
-		:param b2: (x2',y2') line segment 2 - ending position
+		:param a1: (x1,y1) line segment 1 - starting positions (N,2)
+		:param a2: (x1',y1') line segment 1 - ending positions (N,2)
+		:param b1: (x2,y2) line segment 2 - starting positions (N,2)
+		:param b2: (x2',y2') line segment 2 - ending positions (N,2)
 		:return: point of intersection, if intersect; None, if do not intersect
 		#adopted from https://github.com/LinguList/TreBor/blob/master/polygon.py
 		"""
@@ -89,9 +90,51 @@ class Lidar:
 		condx_b = min(b1[0], b2[0])-delta <= intersct[0] and max(b1[0], b2[0])+delta >= intersct[0] #within line segment b1_x-b2_x
 		condy_a = min(a1[1], a2[1])-delta <= intersct[1] and max(a1[1], a2[1])+delta >= intersct[1] #within line segment a1_y-b1_y
 		condy_b = min(b1[1], b2[1])-delta <= intersct[1] and max(b1[1], b2[1])+delta >= intersct[1] #within line segment a2_y-b2_y
+
 		if not (condx_a and condy_a and condx_b and condy_b):
 			intersct = None #line segments do not intercept i.e. interception is away from from the line segments
-			
+		return intersct
+
+	def get_batch_intersection(self, a1, a2, b1, b2) :
+		"""
+		:param a1: (x1,y1) line segment 1 - starting positions (N,2)
+		:param a2: (x1',y1') line segment 1 - ending positions (N,2)
+		:param b1: (x2,y2) line segment 2 - starting positions (N,2)
+		:param b2: (x2',y2') line segment 2 - ending positions (N,2)
+		:return: point of intersection, if intersect; None, if do not intersect
+		#adopted from https://github.com/LinguList/TreBor/blob/master/polygon.py
+		"""
+		def perp(a) :
+			b = np.empty_like(a)
+			b[:,0] = -a[:,1]
+			b[:,1] = a[:,0]
+			return b
+		
+		da = a2-a1
+		db = b2-b1
+		dp = a1-b1
+		dap = perp(da)
+		#denom = np.dot( dap, db)
+		denom = (dap*db).sum(axis=1)
+		#num = np.dot( dap, dp )
+		num = (dap*dp).sum(axis=1)
+		
+		ndd = num/denom
+		intersct = np.vstack([ndd*db[:,0], ndd*db[:,1]]).T + b1 #TODO: check divide by zero!
+		delta = 1e-3
+		#condx_a = min(a1[0], a2[0])-delta <= intersct[0] and max(a1[0], a2[0])+delta >= intersct[0] #within line segment a1_x-a2_x
+		condx_a = (np.min(np.vstack([a1[:,0],a2[:,0]]), axis=0) - delta <= intersct[:,0]) * (np.max(np.vstack([a1[:,0],a2[:,0]]),axis=0) + delta >= intersct[:,0])
+		#condx_b = min(b1[0], b2[0])-delta <= intersct[0] and max(b1[0], b2[0])+delta >= intersct[0] #within line segment b1_x-b2_x
+		condx_b = (np.min(np.vstack([b1[:,0],b2[:,0]]),axis=0) - delta <= intersct[:,0]) * (np.max(np.vstack([b1[:,0],b2[:,0]]),axis=0) + delta >= intersct[:,0])
+		#condy_a = min(a1[1], a2[1])-delta <= intersct[1] and max(a1[1], a2[1])+delta >= intersct[1] #within line segment a1_y-b1_y
+		condy_a = (np.min(np.vstack([a1[:,1],a2[:,1]]),axis=0) - delta <= intersct[:,1]) * (np.max(np.vstack([a1[:,1],a2[:,1]]),axis=0) + delta >= intersct[:,1])
+		#condy_b = min(b1[1], b2[1])-delta <= intersct[1] and max(b1[1], b2[1])+delta >= intersct[1] #within line segment a2_y-b2_y
+		condy_b = (np.min(np.vstack([b1[:,1],b2[:,1]]), axis=0) - delta <= intersct[:,1]) * (np.max(np.vstack([b1[:,1],b2[:,1]]),axis=0) + delta >= intersct[:,1])
+
+		# if not (condx_a and condy_a and condx_b and condy_b):
+		# 	intersct = None #line segments do not intercept i.e. interception is away from from the line segments
+		mask = ~(condx_a * condx_b * condy_a * condy_b)
+		intersct[mask] = np.inf
 		return intersct
 
 	def get_laser_ref(self, robot_pose=np.array([4.04, 2.0, 0])):
@@ -100,28 +143,55 @@ class Lidar:
 			robot_pose: robot's position in the global coordinate system in meter and rad
 		:return: 1xn_reflections array indicating the laser end point
 		"""
-		xy_robot = robot_pose[:2] * 1000 #robot position from meter to mm
-		theta_robot = robot_pose[2] + 0.08 #robot angle in rad
+		delta_vec = np.array([0.12 * np.cos(robot_pose[2]), 0.12 * np.sin(robot_pose[2])])
+		xy_robot = (robot_pose[:2] + delta_vec) * 1000 #robot position from meter to mm
+		theta_robot = robot_pose[2] - 0.17 #robot angle in rad
 		
 		angles = np.linspace(theta_robot - self.fov/2, theta_robot + self.fov/2, self.num_particles, endpoint=False)
 		dist_theta = self.max_dist*np.ones(self.num_particles) # set all laser reflections to max_dist
-		point_theta = np.zeros((self.num_particles, 2))
-		delta_vec = np.array([0.15 * np.cos(robot_pose[2]), 0.15 * np.sin(robot_pose[2])])
+		
 		
 		for seg_i in self.obstacles_segment:
 			xy_i_start, xy_i_end = np.array(seg_i[:2]), np.array(seg_i[2:]) #starting and ending points of each segment
 			for j, theta in enumerate(angles):
-				xy_ij_max = xy_robot + np.array([self.max_dist*np.cos(theta), self.max_dist*np.sin(theta)]) + delta_vec # max possible distance
+				xy_ij_max = xy_robot + np.array([self.max_dist*np.cos(theta), self.max_dist*np.sin(theta)]) # max possible distance
 				intersection = self.get_intersection(xy_i_start, xy_i_end, xy_robot, xy_ij_max)
 
 				if intersection is not None: #if the line segments intersect
 					r = np.sqrt(np.sum((intersection-xy_robot)**2)) #radius
-
 					if r < dist_theta[j]:
 						dist_theta[j] = r
-						point_theta[j] = intersection / 1000
 
-		return dist_theta/1000, point_theta
+		return dist_theta/1000
+
+	def get_batch_laser_ref(self, robot_pose=np.array([4.04, 2.0, 0])):
+		"""
+		:param
+			robot_pose: robot's position in the global coordinate system in meter and rad
+		:return: 1xn_reflections array indicating the laser end point
+		"""
+		delta_vec = np.array([0.12 * np.cos(robot_pose[2]), 0.12 * np.sin(robot_pose[2])])
+		xy_robot = (robot_pose[:2] + delta_vec) * 1000 #robot position from meter to mm
+		theta_robot = robot_pose[2] #robot angle in rad
+		
+		angles = np.linspace(theta_robot - self.fov/2, theta_robot + self.fov/2, self.num_particles, endpoint=False)
+		dist_theta = self.max_dist*np.ones(self.num_particles) # set all laser reflections to max_dist		
+		
+		for seg_i in self.obstacles_segment:
+			xy_i_start, xy_i_end = np.array(seg_i[:2]), np.array(seg_i[2:]) #starting and ending points of each segment
+			xy_ij_max = np.array([self.max_dist*np.cos(angles), self.max_dist*np.sin(angles)]).T # max possible distance
+			xy_ij_max[:,0] += xy_robot[0]
+			xy_ij_max[:,1] += xy_robot[1]
+
+			robot_poses = np.tile(xy_robot, len(angles)).reshape(-1, 2)
+			intersection = self.get_batch_intersection(
+				np.tile(xy_i_start, len(angles)).reshape(-1, 2), 
+				np.tile(xy_i_end, len(angles)).reshape(-1, 2), 
+				robot_poses, 
+				xy_ij_max)
+			r = np.linalg.norm(intersection - robot_poses,axis=1)
+			dist_theta = np.min(np.vstack([r,dist_theta]), axis=0)
+		return dist_theta/1000
 
 	def paint(self, pointcloud, robot_pose):
 		figure, axes = plt.subplots()
@@ -163,6 +233,7 @@ class Filter:
 		self.init_pos = np.array([float(init_pose[0]),float(init_pose[1])])
 		self.init_theta = init_pose[2]
 		self.init_obs = init_obs
+		print(init_obs)
 		self.lidar = Lidar()
 		if not (dyn_obs is None):
 			dynamic_obs = np.hstack([dyn_obs-0.15, dyn_obs+0.15]) * 1000
@@ -186,7 +257,7 @@ class Filter:
 		dist = np.inf
 		idx = 0
 		for i in range(self.samples):
-			scan, pc = self.lidar.get_laser_ref(np.array([rand_coord[i,0],rand_coord[i,1],self.init_theta]))
+			scan = self.lidar.get_batch_laser_ref(np.array([rand_coord[i,0],rand_coord[i,1],self.init_theta]))
 			_dist = self.diff(scan)
 			if _dist < dist:
 				dist = _dist
@@ -202,7 +273,7 @@ class Filter:
 			rand_coord += E
 			dists = np.zeros(self.samples//search_depth)
 			for j in range(self.samples//search_depth):
-				scan, _ = self.lidar.get_laser_ref(np.array([rand_coord[j,0], rand_coord[j,1],self.init_theta]))
+				scan = self.lidar.get_batch_laser_ref(np.array([rand_coord[j,0], rand_coord[j,1],self.init_theta]))
 				_dist = self.diff(scan)
 				dists[j] = _dist
 			order = np.argsort(dists)
@@ -218,11 +289,12 @@ class Filter:
 		return updated_pose
 
 if __name__ == "__main__":
-	lidar = Lidar(dyn_obs=np.load("dyna_obs.npy"))
-	robot_pose = np.load("robot_pose.npy") 
-	dist, pc = lidar.get_laser_ref(robot_pose)
-	pc2 = scan2pc(np.load("laser.npy")[::-1],robot_pose)
-	#pc = 
+	lidar = Lidar() # dyn_obs=np.load("dyna_obs.npy")
+	#robot_pose = np.load("robot_pose.npy") 
+	robot_pose = np.array([6.02, 0.75, 2.1995316])
+	dist = lidar.get_batch_laser_ref(robot_pose)
+	pc2 = scan2pc(np.load("scan.npy")[::-1],robot_pose)
+	pc = scan2pc(dist,robot_pose)
 	print(pc.shape)
 	lidar.paint(pc,robot_pose)
 	plt.show()
