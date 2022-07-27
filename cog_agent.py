@@ -50,7 +50,6 @@ class Agent:
             print("Filtered:", filtered_obs['vector'][0])
             self.robot_env.add_obstacles_from_obs(obs)
             self.calc_min_dist(obs)
-
         else:
             filtered_obs = self.estimate(obs, self.last_action)
 
@@ -140,9 +139,9 @@ class Agent:
             self.stage_2_navigator = self.queue.get_nowait()
         except:
             pass
-        if not (self.stage_2_navigator is None):
+        if (not (self.stage_2_navigator is None)) and \
+            np.linalg.norm(np.asarray(obs['vector'][0][:2])-np.asarray(obs['vector'][3][:2])) > 1.0:
             v = self.stage_2_navigator.navigate_linear(obs['vector'][0])
-            print("Reach Here")
         else:
             v = [0,0]
         action = self.robot_env._inner_policy(obs, v[0], v[1])
@@ -150,12 +149,12 @@ class Agent:
 
     def plan_movement_stage_2(self,my_pose, en_pose, advantage_flag, best_corner):
         if advantage_flag:
-            navigator = Navigator(self.stage_2_search_space, my_pose, en_pose, final_linear_tolerance=2)
+            navigator = Navigator(self.stage_2_search_space, my_pose, en_pose, final_linear_tolerance=2, linear_speed=1.0)
         else:
             if not (best_corner is None):
-                navigator = Navigator(self.stage_2_search_space, my_pose, self.corners[best_corner], final_linear_tolerance=2)
+                navigator = Navigator(self.stage_2_search_space, my_pose, self.corners[best_corner], final_linear_tolerance=2, linear_speed=1.0)
             else:
-                navigator = Navigator(self.stage_2_search_space, my_pose, en_pose, final_linear_tolerance=2)
+                navigator = Navigator(self.stage_2_search_space, my_pose, en_pose, final_linear_tolerance=2, linear_speed=1.0)
         result = navigator.plan()
         if result:
             self.queue.put(navigator)
@@ -173,7 +172,7 @@ class Agent:
             # Need to unlock
             if not (info is None):
                 self.plan_movement_stage_2(info[0], info[1], info[2], info[3])
-            time.sleep(0.01)
+            time.sleep(1)
 
 
     def estimate(self, obs, action=None):
@@ -192,7 +191,7 @@ class Agent:
                                  samples=300)
             current_pose = self.filter.current_pose
         else:
-            current_pose = self.filter.filter_obs(obs['vector'], np.array(action))
+            current_pose = self.filter.filter_obs(obs['vector'])
 
         current_obs['vector'][0] = current_pose.tolist()
         #print(current_obs['vector'][0])
@@ -204,6 +203,7 @@ class Agent:
         self.robot_env.last_flag = False
         self.current_goal = -1
         self.plan_process = mp.Process(target=self.planning_process)
+        self.stage_2_init = True
         self.running_flag.value = 0
         
 

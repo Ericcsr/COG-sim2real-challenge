@@ -5,9 +5,9 @@ import param
 import copy
 
 def scan2pc(scan,robot_pose):
-	theta = robot_pose[2]-0.18
+	theta = robot_pose[2]+0.04
 	robot_pose[:2] += np.array([0.12 * np.cos(theta), 0.12 * np.sin(theta)])
-	angles = np.linspace(theta-np.pi*120/180,theta+np.pi*120/180,len(scan), endpoint=True)
+	angles = np.linspace(theta-np.pi*135/180,theta+np.pi*135/180,len(scan), endpoint=True)
 	pc = np.zeros((len(scan),2))
 	pc[:,0] = scan * np.cos(angles)+robot_pose[0]
 	pc[:,1] = scan * np.sin(angles)+robot_pose[1]
@@ -145,9 +145,9 @@ class Lidar:
 		"""
 		delta_vec = np.array([0.12 * np.cos(robot_pose[2]), 0.12 * np.sin(robot_pose[2])])
 		xy_robot = (robot_pose[:2] + delta_vec) * 1000 #robot position from meter to mm
-		theta_robot = robot_pose[2] - 0.17 #robot angle in rad
+		theta_robot = robot_pose[2] #robot angle in rad
 		
-		angles = np.linspace(theta_robot - self.fov/2, theta_robot + self.fov/2, self.num_particles, endpoint=False)
+		angles = np.linspace(theta_robot - self.fov/2, theta_robot + self.fov/2, self.num_particles, endpoint=True)
 		dist_theta = self.max_dist*np.ones(self.num_particles) # set all laser reflections to max_dist
 		
 		
@@ -170,11 +170,12 @@ class Lidar:
 			robot_pose: robot's position in the global coordinate system in meter and rad
 		:return: 1xn_reflections array indicating the laser end point
 		"""
-		delta_vec = np.array([0.12 * np.cos(robot_pose[2]), 0.12 * np.sin(robot_pose[2])])
+		theta_robot = robot_pose[2] + 0.04 #robot angle in rad
+		delta_vec = np.array([0.12 * np.cos(theta_robot), 0.12 * np.sin(theta_robot)])
 		xy_robot = (robot_pose[:2] + delta_vec) * 1000 #robot position from meter to mm
-		theta_robot = robot_pose[2] #robot angle in rad
 		
-		angles = np.linspace(theta_robot - self.fov/2, theta_robot + self.fov/2, self.num_particles, endpoint=False)
+		
+		angles = np.linspace(theta_robot - self.fov/2, theta_robot + self.fov/2, self.num_particles, endpoint=True)
 		dist_theta = self.max_dist*np.ones(self.num_particles) # set all laser reflections to max_dist		
 		
 		for seg_i in self.obstacles_segment:
@@ -212,24 +213,30 @@ class MotionModel:
 		self.weight = weight
 
 	def map_velocity(self, action, theta):
-		action = copy.deepcopy(action)
+		"""
+		Assume obs is the obs['vector']
+		"""
+		#action = np.asarray(copy.deepcopy(obs[11]))
 		vx = action[0] * np.cos(theta) - action[1] * np.sin(theta)
 		vy = action[0] * np.sin(theta) + action[1] * np.cos(theta)
 		action[0] = vx
 		action[1] = vy
 		return action
 
-	def update(self, action, s_obs):
-		action.clip([-2,-2,-np.pi/4,-np.inf],[2,2,np.pi/4,np.inf])
-		action = self.map_velocity(action, self.current_pose[2])
-		s_update = self.current_pose + action[:3] * param.TS
+	def update(self, obs, s_obs):
+		act = np.asarray(obs[11]).clip([-2,-2,-np.pi/4],[2,2,np.pi/4])
+		#print(action)
+		#action.clip([-2,-2,-np.pi/4,-np.inf],[2,2,np.pi/4,np.inf])
+		# Target Velocity
+		action = self.map_velocity(act, self.current_pose[2])
+		s_update = self.current_pose + action * param.TS
 		w=np.array([self.weight, self.weight, 1])
 		s = w * s_obs + (1-w) * s_update
 		self.current_pose = s
 		return s
 
 class Filter:
-	def __init__(self, init_obs, init_pose, dyn_obs=None, samples=2000): # dyn_obs: [5, 2]
+	def __init__(self, init_obs, init_pose, dyn_obs=None, samples=3000): # dyn_obs: [5, 2]
 		self.init_pos = np.array([float(init_pose[0]),float(init_pose[1])])
 		self.init_theta = init_pose[2]
 		self.init_obs = init_obs
@@ -279,19 +286,18 @@ class Filter:
 			order = np.argsort(dists)
 			current_guess = np.mean(rand_coord[order][:3], axis=0) # Only select top 3 as candidate.
 		return current_guess - self.init_pos
-			
-
-	def filter_obs(self, obs_vec, action):
+	
+	def filter_obs(self, obs_vec):
 		obs_pose = obs_vec[0][:3]
 		obs_pose[0] += self.offset[0]
 		obs_pose[1] += self.offset[1]
-		updated_pose = self.model.update(action, obs_pose)
+		updated_pose = self.model.update(obs_vec, obs_pose)
 		return updated_pose
 
 if __name__ == "__main__":
 	lidar = Lidar() # dyn_obs=np.load("dyna_obs.npy")
 	#robot_pose = np.load("robot_pose.npy") 
-	robot_pose = np.array([6.02, 0.75, 2.1995316])
+	robot_pose = np.array([3.31, 2.92, -0.61070335])
 	dist = lidar.get_batch_laser_ref(robot_pose)
 	pc2 = scan2pc(np.load("scan.npy")[::-1],robot_pose)
 	pc = scan2pc(dist,robot_pose)

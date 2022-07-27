@@ -4,7 +4,7 @@ from cog_agent import Agent
 
 
 if __name__ == "__main__":
-    env = CogEnvDecoder(env_name="win_v3.0/cog_sim2real_env.exe", no_graphics=False, time_scale=1, worker_id=1, force_sync=False)
+    env = CogEnvDecoder(env_name="../win_v3.1/cog_sim2real_env.exe", no_graphics=False, time_scale=1, worker_id=1, force_sync=False, seed=209)
 
     num_eval_episodes = 10
 
@@ -26,8 +26,9 @@ if __name__ == "__main__":
             scan_noise = np.random.uniform(-0.05, 0.05, len(obs['laser']))
             obs['vector'][0][:2] += bias + pos_noise
             obs['laser'] += scan_noise
-            #np.save("scan.npy", obs['laser'])
+            #np.save("scan.npy", obs['laser'])   
             action = eval_agent.agent_control(obs=obs, done=done, info=info)
+            #exit()
             obs, reward, done, info = env.step(action)
 
         num_activted_goals = info[1][3]

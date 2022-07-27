@@ -27,7 +27,7 @@ def check_state(state, info=None):
     print("-----------------------end check---------------------")
 
 
-env = CogEnvDecoder(env_name="win_v3.0/cog_sim2real_env.exe", no_graphics=False, 
+env = CogEnvDecoder(env_name="../win_v3.1/cog_sim2real_env.exe", no_graphics=False, 
                     time_scale=1, worker_id=2, seed=1234, force_sync=False) # linux os
 # env = CogEnvDecoder(env_name="win_V1/RealGame.exe", no_graphics=False, time_scale=1, worker_id=1) # windows os
 # env_name: path of the simulator
@@ -68,6 +68,7 @@ for i in range(num_episodes):
             action = [0, 0, -np.pi/4, 0]
         else:
             action = [0,0,0,0]
-        check_state(obs, info)
+        #check_state(obs, info)
+        print(obs['vector'][0])
         if done:
             break
