@@ -188,7 +188,7 @@ class Agent:
             self.filter = Filter(init_obs=obs['laser'][::-1],
                                  init_pose=obs['vector'][0],
                                  dyn_obs=dyn_obstacles,
-                                 samples=300)
+                                 samples=150)
             current_pose = self.filter.current_pose
         else:
             current_pose = self.filter.filter_obs(obs['vector'])

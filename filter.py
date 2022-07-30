@@ -207,7 +207,7 @@ class Lidar:
 		plt.ylim(0, 4.480)
 
 class MotionModel:
-	def __init__(self, init_pose, weight=0.5):
+	def __init__(self, init_pose, weight=1.0):
 		self.init_pose = init_pose
 		self.current_pose = init_pose.copy()
 		self.weight = weight
