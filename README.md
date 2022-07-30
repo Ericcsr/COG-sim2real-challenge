@@ -23,6 +23,8 @@ Step 4. Install some related packages:
 
 Step 5. Run the submit_test.py, you will see our simulation environment. Please use v2.2 to test the algorithm
 
+Step 6. If the first stage is too slow, try to toggle USE_CUDA in param.py
+
 ## Important notes
 
 The data from the simulator is clear, but it will be perturbed with biases and noises during the test stage. More information can be found in the [rulebook](https://github.com/DRL-CASIA/COG-sim2real-challenge/blob/main/CoG%20Challenge%20Rules-v1.2.pdf).
