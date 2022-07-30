@@ -7,6 +7,7 @@ OMEGA_LIMIT=np.pi/2
 TS=0.04
 X_MAX = 8.08
 Y_MAX = 4.48
+USE_CUDA=False
 
 SYSTEM="linux" if platform.system() != "Windows" else "win"
 CONFRONTATION_NAME=f"{SYSTEM}_confrontation_v2.1/cog_confrontation_env.exe"

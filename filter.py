@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 import matplotlib.pyplot as plt
 import time
 import param
@@ -137,6 +138,48 @@ class Lidar:
 		intersct[mask] = np.inf
 		return intersct
 
+	def get_batch_intersection_cuda(self, a1, a2, b1, b2) :
+		"""
+		:param a1: (x1,y1) line segment 1 - starting positions (N,2)
+		:param a2: (x1',y1') line segment 1 - ending positions (N,2)
+		:param b1: (x2,y2) line segment 2 - starting positions (N,2)
+		:param b2: (x2',y2') line segment 2 - ending positions (N,2)
+		:return: point of intersection, if intersect; None, if do not intersect
+		#adopted from https://github.com/LinguList/TreBor/blob/master/polygon.py
+		"""
+		def perp(a) :
+			b = torch.empty_like(a)
+			b[:,0] = -a[:,1]
+			b[:,1] = a[:,0]
+			return b.cuda()
+		
+		da = a2-a1
+		db = b2-b1
+		dp = a1-b1
+		dap = perp(da)
+		#denom = np.dot( dap, db)
+		denom = (dap*db).sum(dim=1)
+		#num = np.dot( dap, dp )
+		num = (dap*dp).sum(dim=1)
+		
+		ndd = num/denom
+		intersct = torch.vstack([ndd*db[:,0], ndd*db[:,1]]).T + b1 #TODO: check divide by zero!
+		delta = 1e-3
+		#condx_a = min(a1[0], a2[0])-delta <= intersct[0] and max(a1[0], a2[0])+delta >= intersct[0] #within line segment a1_x-a2_x
+		condx_a = (torch.min(torch.vstack([a1[:,0],a2[:,0]]), dim=0)[0] - delta <= intersct[:,0]) * (torch.max(torch.vstack([a1[:,0],a2[:,0]]),dim=0)[0]+ delta >= intersct[:,0])
+		#condx_b = min(b1[0], b2[0])-delta <= intersct[0] and max(b1[0], b2[0])+delta >= intersct[0] #within line segment b1_x-b2_x
+		condx_b = (torch.min(torch.vstack([b1[:,0],b2[:,0]]), dim=0)[0] - delta <= intersct[:,0]) * (torch.max(torch.vstack([b1[:,0],b2[:,0]]),dim=0)[0] + delta >= intersct[:,0])
+		#condy_a = min(a1[1], a2[1])-delta <= intersct[1] and max(a1[1], a2[1])+delta >= intersct[1] #within line segment a1_y-b1_y
+		condy_a = (torch.min(torch.vstack([a1[:,1],a2[:,1]]),dim=0)[0] - delta <= intersct[:,1]) * (torch.max(torch.vstack([a1[:,1],a2[:,1]]), dim=0)[0] + delta >= intersct[:,1])
+		#condy_b = min(b1[1], b2[1])-delta <= intersct[1] and max(b1[1], b2[1])+delta >= intersct[1] #within line segment a2_y-b2_y
+		condy_b = (torch.min(torch.vstack([b1[:,1],b2[:,1]]), dim=0)[0] - delta <= intersct[:,1]) * (torch.max(torch.vstack([b1[:,1],b2[:,1]]), dim=0)[0] + delta >= intersct[:,1])
+
+		# if not (condx_a and condy_a and condx_b and condy_b):
+		# 	intersct = None #line segments do not intercept i.e. interception is away from from the line segments
+		mask = ~(condx_a * condx_b * condy_a * condy_b)
+		intersct[mask] = torch.inf
+		return intersct
+
 	def get_laser_ref(self, robot_pose=np.array([4.04, 2.0, 0])):
 		"""
 		:param
@@ -164,7 +207,7 @@ class Lidar:
 
 		return dist_theta/1000
 
-	def get_batch_laser_ref(self, robot_pose=np.array([4.04, 2.0, 0])):
+	def get_batch_laser_ref(self, robot_pose=np.array([4.04, 2.0, 0]), cuda=param.USE_CUDA):
 		"""
 		:param
 			robot_pose: robot's position in the global coordinate system in meter and rad
@@ -185,11 +228,18 @@ class Lidar:
 			xy_ij_max[:,1] += xy_robot[1]
 
 			robot_poses = np.tile(xy_robot, len(angles)).reshape(-1, 2)
-			intersection = self.get_batch_intersection(
-				np.tile(xy_i_start, len(angles)).reshape(-1, 2), 
-				np.tile(xy_i_end, len(angles)).reshape(-1, 2), 
-				robot_poses, 
-				xy_ij_max)
+			if cuda:
+				intersection = self.get_batch_intersection_cuda(
+					torch.from_numpy(np.tile(xy_i_start, len(angles)).reshape(-1, 2)).cuda(), 
+					torch.from_numpy(np.tile(xy_i_end, len(angles)).reshape(-1, 2)).cuda(), 
+					torch.from_numpy(robot_poses).cuda(), 
+					torch.from_numpy(xy_ij_max).cuda()).cpu().numpy()
+			else:
+				intersection = self.get_batch_intersection(
+					np.tile(xy_i_start, len(angles)).reshape(-1, 2), 
+					np.tile(xy_i_end, len(angles)).reshape(-1, 2), 
+					robot_poses, 
+					xy_ij_max)
 			r = np.linalg.norm(intersection - robot_poses,axis=1)
 			dist_theta = np.min(np.vstack([r,dist_theta]), axis=0)
 		return dist_theta/1000
@@ -207,7 +257,7 @@ class Lidar:
 		plt.ylim(0, 4.480)
 
 class MotionModel:
-	def __init__(self, init_pose, weight=1.0):
+	def __init__(self, init_pose, weight=0.5):
 		self.init_pose = init_pose
 		self.current_pose = init_pose.copy()
 		self.weight = weight
@@ -271,7 +321,7 @@ class Filter:
 				idx = i
 		return rand_coord[idx] - self.init_pos
 
-	def debias_hierarchical(self, search_depth = 3):
+	def debias_hierarchical(self, search_depth = 2):
 		current_guess = self.init_pos.copy()
 		for i in range(search_depth):
 			rand_coord = np.tile(current_guess, self.samples//search_depth).reshape(-1, 2)

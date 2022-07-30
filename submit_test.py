@@ -4,7 +4,7 @@ from cog_agent import Agent
 
 
 if __name__ == "__main__":
-    env = CogEnvDecoder(env_name="../win_v3.1/cog_sim2real_env.exe", no_graphics=False, time_scale=1, worker_id=1, force_sync=False, seed=209)
+    env = CogEnvDecoder(env_name="../linux_v3.1/cog_sim2real_env.x86_64", no_graphics=False, time_scale=1, worker_id=1, force_sync=False, seed=209)
 
     num_eval_episodes = 10
 
